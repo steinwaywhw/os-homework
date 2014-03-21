@@ -1,0 +1,27 @@
+
+
+[TEAM MEMBER]
+Hanwen Wu
+Ming Chen
+
+
+[HOW TO BUILD]
+
+This need "zlog" to build. It can be installed via GitHub https://github.com/HardySimpson/zlog
+Qt is also needed for UI
+
+After installed, type these:
+
+$.> cd build
+$./build> cmake ..
+$./build> make
+
+The ./build/streamserver is a console server, type "q\n" or send Ctrl+C to terminate it.
+The ./build/altstreamserver is a console server using our own sync primitives.
+The ./build/streamclient is a UI client
+The ./build/test_socket_server is a console test for server and client. Need to modify src to compile.
+
+
+
+
+

@@ -1,0 +1,111 @@
+README
+
+NOTE: Since there are differences between machines. I just upload binary files together with makefiles and source files. I you can't compile it on your machine, just try the binary files directly. Or we can demo it to you on our own machine. Thank you!
+
+This project is done in such a way:
+
+The first part is finished by Ming Chen and Hanwen Wu individually. The second part is finished by us cooperatively.
+
+\
+|--hwwu\		<= first part by Hanwen Wu
+|--mingchen\	<= first part by Ming Chen
+|--grub\		<= second part by Ming Chen and Hanwen Wu
+|
+|--README
+
+
+[[[Part I by Hanwen Wu]]]
+
+This one is using INT 15H, AX=E820 BIOS call, which gets the memory map. It is done using the following steps. 
+
+1. Initialize all regs. DS, ES, SS to 0x0000, SI, DI to 0x0000, BP, SP to 0x1000 to reserve a stack.
+
+2. Print welcome message using a print string function call. (explained later)
+
+3. Init EAX to 0x0000E820, EBX = 0, EDX = SMAP_MAGIC_NUMBER (0x534D4150), ES:EDI for a destination buffer, and call INT 0x15. (Details could be found in the source code comments). The a list of descriptor will be returned in the buffer.
+
+4. Traverse all the returened descriptor in the buffer, print their BASE, LENGTH, and TYPE.
+
+5. Halt.
+
+There are many auxilary functions in the code. 
+
+1. Print String: This one uses INT 0x10, with AH = 0x13. 
+
+2. Print Hex Digit: This one convert the lower 4 bits of AL into ASCII and print it out using INT 0x10, with AH = 0x0e
+
+3. Print 32: This one prints a 32bit hex number indicated by the content pointed by ESI. It's a loop call to Print Hex Digit
+
+4. Print 64: Pretty much the same with Print 32. Just pay extra attention to the endian issues.
+
+5. Print MMARD: This one prints the memory map address range decriptors returned by INT 0x15, AX = E820. It utilizes those Print XX functions. The MMARD data structure is defined in many documents. 
+
+How to make
+
+I am using cygwin for this part. The makefile is provided. The general idea is:
+
+1. Using as to assemble the code into object file
+2. Link edit the object file into a executable file. In my case, I specify the LMA to be 0x7c00 so that every symbol is correctly addressed. ld -Ttext 0x7c00 -e _start ...
+3. Objcopy to copy only the text section into a new raw binary file
+4. Convert the image into Virtual Box Disk Image, and load it to run.
+
+[[[Part I by Ming Chen]]]
+
+The First deliverable is done in following steps:
+
+1.  Build virtual disk using dd:
+	$dd if=/dev/zero of=disk.img bs=1k count=32760
+
+In the assembly code
+
+2.	initialize the registers
+3.	Print the MemOS welcome string, using loop and lodsb.
+4.	use int 0x15 ax = 0xE801 to detect the memory
+5.	call print function to print the memory to screen. I use the print function provided in the example vga16.s
+
+How to run
+
+compile: 
+	as --32 memos1.s -o memos1.o
+link: 
+	ld -T memos1.ld memos1.o memos1
+use dd to create a sector image fit in MBR so that we don't need to use the disk.img
+	dd bs=1 if=memos1 of=memos1_test skip=4096 count=512
+run in QEMU
+	qemu -hda memos1_test
+
+
+[[[Part II by Ming Chen and Hanwen Wu]]]
+
+This one, the real loader is the GRUB, who loads the ELF image into memory. The assembly code is mainly for the multiboot header, and a quick jumper to the C code. Before go to C code, it pushes arguments onto stack using C calling conventions.
+
+The C code is very straight forword. 
+
+1. Clear screen by writing zeros to the frame buffer
+2. Print welcome messages and arguments passed in
+3. Find MMAP structure in the MULTIBOOT structure, using offsets.
+4. Print them.
+
+The aux functions are:
+
+1. itoa: converts 32bit unsigned integers into ascii strings. It supports HEX and DEC.
+2. putchar: write to the frame buffer, and update the cursor (saved in the glabol variables)
+3. printf: parse the format string, and print them using putchar. The trick here is how to get arguments. We hack C calling conventions. We know the address of the format string, that address contains a pointer, and the address is on the stack. Add the address by 1 machine word, which is the length of a pointer, we will get the next argument on the stack.
+
+How to make
+
+We write this under 32bit Ubuntu Linux. The makefile is provided. It will generate a kentry.bin in elf32-i386 format.
+
+How to run
+
+1. Put the output file kentry.bin under /boot/
+2. Reboot the system
+3. Strike SHIFT until you enter GRUB menu
+4. Strike C to enter GRUB command line
+5. $> multiboot /boot/kentry.bin <ENTER>
+6. $> boot <ENTER>
+7. You will see the result
+
+[[[Known Issue]]]
+
+The E820 call will report a map of 4GB on Hanwen's VirtualBox and Ming's QEMU no matter how real memory is set to the VM. No reason for that. It may be ralated to some emulation issues of those virtual machine software. We have talked about this problem with Prof West. And the current answer is that, the whole boot strap is totally OK, the E820 result is acceptable. But furthur investigation is needed to figure it out. 

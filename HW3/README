@@ -1,0 +1,22 @@
+[How to Test]
+
+1. Use makefile to make it. Just type "make"
+2. Execute ./parent to test
+
+If you would like to see all tracing information, you need to uncomment one line in the parent.c. It is marked clearly in the source code.
+
+[How I Archived]
+
+The general idea is to trace all system call until a "write" is found. Then use ptrace to get "write" syscall params, in order to gain access to the string in the child's code/data segment. Copy that to the parent, translate, and copy back to the child all using ptrace. Then do a ptrace(PTRACE_SYSCALL) to resume child's execution.
+
+Most of the function names are self-commented, please refer to the source code for detail information.
+
+There are some syscalls that need some explaination.
+
+1. wait(&status), this will wait the child until a signal arrives at parent. And wait() will query child's status and stored in the location.
+
+2. ptrace(TRACEME) and exec*(), this will cause the child to pause and signal its parent after the new program is loaded. So the first trace information a parent could get is an "exiting exec()", instead of "entering exec()".
+
+3. ptrace(SYSCALL), this will resume child's execution, and cause it to be paused until next syscall.
+
+4. I forgot that C doesn't have boolean. So I define a boolean for convenience.
